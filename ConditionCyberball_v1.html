@@ -817,7 +817,7 @@
 <section id="socialAttentionScreen" class="screen">
   <div class="panel">
     <div class="staticPageNumber" aria-hidden="true">16</div>
-  <div class="eyebrow">Before the game</div><h2>Pay attention to the other players</h2><p>As you play, pay attention to the social behavior of the other players, <b>particularly to how each player interacts with you and with others.</b></p><button class="primary" id="socialAttentionNext">Continue</button></div>
+  <div class="eyebrow">Before the game</div><h2>Pay attention to the other players</h2><p>As you play, pay attention to the social behavior of the other players, <b>particularly to how each player interacts with you and with others.</b></p><button class="primary" id="socialAttentionNext">Start game</button></div>
 </section>
 
 <section id="gameExpectationScreen" class="screen">
@@ -1373,6 +1373,15 @@
     consistency:[{key:'consistent_with_feedback',prompt:n=>`How consistent was ${n}'s ball-tossing behavior with what ${n} said about you earlier?`}],
     attribution:[
       {key:'impression_of_me',prompt:n=>`How much was ${n}'s ball-tossing behavior related to their impression of you?`}
+    ],
+    // Mood check, right before and right after the ball game (0–100 sliders)
+    mood:[
+      {key:'happy',prompt:()=>'Happy'},
+      {key:'sad',prompt:()=>'Sad'},
+      {key:'anxious',prompt:()=>'Anxious'},
+      {key:'pleased',prompt:()=>'Pleased'},
+      {key:'upset',prompt:()=>'Upset'},
+      {key:'excited',prompt:()=>'Excited'}
     ]
   };
   function measureAnchors(q){
@@ -1383,7 +1392,7 @@
   }
   // Sliders (0–100): post-game attribution, and the two pre-game group screens (A3, B6).
   function measureUsesSlider(step){
-    return step.kind==='attribution' || (step.kind==='group' && ['A3','B6'].includes(step.timepoint));
+    return step.kind==='attribution' || step.kind==='mood' || (step.kind==='group' && ['A3','B6'].includes(step.timepoint));
   }
   function measurePerson(step){
     return step.role ? (identities[step.role]||futureCandidates.find(p=>p.role===step.role)) : null;
@@ -1412,6 +1421,8 @@
       else if(stage==='E5')startAttributions();
       else if(stage==='E6')showScreen('ultimatumResultsIntroScreen');
       else if(stage==='S1')showScreen('economicTaskIntroScreen');
+      else if(stage==='MOOD_PRE')showScreen('socialAttentionScreen');
+      else if(stage==='MOOD_POST')startMeasureSequence(makeMeasureSteps('C2_group','group'));
       return;
     }
     measureStep=measureQueue.shift();measureAnswers={};measureFirstClick={};measureStarted=performance.now();
@@ -1419,16 +1430,16 @@
     const avatarBox=el('studyMeasureAvatar');
     if(person){avatarBox.innerHTML=avatarHTML(person.avatarId||person.icon);avatarBox.style.display='';}
     else{avatarBox.innerHTML='';avatarBox.style.display='none';}
-    el('studyMeasureTitle').textContent=measureStep.kind==='group'?'About the group':measureStep.kind==='future_group'?'Your expectations for the new group':measureStep.kind==='before_player'?`Will ${person?.name||'the player'} like you?`:`Your impressions of ${person?.name||'the player'}`;
+    el('studyMeasureTitle').textContent=measureStep.kind==='mood'?'How do you feel at this moment?':measureStep.kind==='group'?'About the group':measureStep.kind==='future_group'?'Your expectations for the new group':measureStep.kind==='before_player'?`Will ${person?.name||'the player'} like you?`:`Your impressions of ${person?.name||'the player'}`;
     const useSlider=measureUsesSlider(measureStep);
-    el('studyMeasureIntro').textContent=(measureStep.kind==='group'&&useSlider)?'Please adjust the slider to indicate your answer.':measureStep.timepoint==='C2_group'?'Thinking about the ball-tossing game, how did you feel?':
+    el('studyMeasureIntro').textContent=((measureStep.kind==='group'||measureStep.kind==='mood')&&useSlider)?'Please adjust the slider to indicate your answer.':measureStep.timepoint==='C2_group'?'Thinking about the ball-tossing game, how did you feel?':
       measureStep.timepoint==='E2'?`Your chosen group: ${futureSelected.map(r=>futureCandidates.find(p=>p.role===r)?.name).join(', ')}.`:
       measureStep.kind==='future_player'?(person?.isNew?`You have not played with ${person.name} yet. Please give your best guess.`:'Based on what you know so far, please give your best impression.'):'';
     const wrap=el('studyMeasureQuestions');wrap.innerHTML='';
     measureQuestionsFor(measureStep).forEach(q=>{
       const item=document.createElement('div');item.className='studyQuestion';
       const heading=document.createElement('p');
-      const promptText=typeof q.prompt==='function'?q.prompt(person.name):q.prompt;
+      const promptText=typeof q.prompt==='function'?q.prompt(person?.name):q.prompt;
       heading.textContent=measureStep.timepoint==='C2_group'
         ?({liked_group:'How much did you feel liked by this group?',valued_group:'How much did you feel valued by this group?',belong_group:'How much did you feel you belonged to this group?'}[q.key]||promptText)
         :promptText;
@@ -1525,7 +1536,12 @@
       return Object.keys(out).length?JSON.stringify(out):'';
     };
     const e2=last('E2');
+    const moodPre=last('MOOD_PRE'), moodPost=last('MOOD_POST');
+    const mood={};
+    if(moodPre)mood.pre=moodPre;
+    if(moodPost)mood.post=moodPost;
     return {
+      Mood:Object.keys(mood).length?JSON.stringify(mood):'',
       Group_Liked:groupCol('liked_group'),
       Group_Valued:groupCol('valued_group'),
       Group_Belong:groupCol('belong_group'),
@@ -3100,7 +3116,7 @@
     });
     el('gameExpectationNext').disabled=false;
     el('gameExpectationValidation').textContent='';
-    el('gameExpectationNext').textContent=gameExpectationIndex===2?'Start game':'Continue';
+    el('gameExpectationNext').textContent='Continue';
   }
   function updateExpectationReady(){
     const role=gameExpectationOrder[gameExpectationIndex];
@@ -3111,7 +3127,7 @@
     if(!(gameExpectations[role]?.inclusion!=null && gameExpectations[role]?.return!=null)){el('gameExpectationValidation').textContent='Please adjust both sliders before continuing.';return;}
     gameExpectationIndex++;
     if(gameExpectationIndex<gameExpectationOrder.length){renderGameExpectationPlayer();return;}
-    completeLog.game_expectations={}; ids.forEach(r=>completeLog.game_expectations[r]={visible_player:identities[r].name,...gameExpectations[r]}); checkpoint(); if(CFG.simpleMode) showScreen('socialAttentionScreen'); else showScreen('rule1Screen');
+    completeLog.game_expectations={}; ids.forEach(r=>completeLog.game_expectations[r]={visible_player:identities[r].name,...gameExpectations[r]}); checkpoint(); if(CFG.simpleMode) startMeasureSequence(makeMeasureSteps('MOOD_PRE','mood')); else showScreen('rule1Screen');
   }
 
   function computePostGameActual(){
@@ -3681,7 +3697,7 @@
       el('phase1FinalScore').textContent=state.scores.ME;
       showScreen('phase2Screen');
     }else{
-      startMeasureSequence(makeMeasureSteps('C2_group','group'));
+      startMeasureSequence(makeMeasureSteps('MOOD_POST','mood'));
     }
   }
 
