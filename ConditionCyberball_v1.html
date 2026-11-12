@@ -1392,7 +1392,7 @@
   }
   // Sliders (0–100): post-game attribution, and the two pre-game group screens (A3, B6).
   function measureUsesSlider(step){
-    return step.kind==='attribution' || step.kind==='mood' || (step.kind==='group' && ['A3','B6'].includes(step.timepoint));
+    return step.kind==='attribution' || step.kind==='mood' || step.timepoint==='E2' || (step.kind==='group' && ['A3','B6','C2_group'].includes(step.timepoint));
   }
   function measurePerson(step){
     return step.role ? (identities[step.role]||futureCandidates.find(p=>p.role===step.role)) : null;
@@ -1432,8 +1432,10 @@
     else{avatarBox.innerHTML='';avatarBox.style.display='none';}
     el('studyMeasureTitle').textContent=measureStep.kind==='mood'?'How do you feel at this moment?':measureStep.kind==='group'?'About the group':measureStep.kind==='future_group'?'Your expectations for the new group':measureStep.kind==='before_player'?`Will ${person?.name||'the player'} like you?`:`Your impressions of ${person?.name||'the player'}`;
     const useSlider=measureUsesSlider(measureStep);
-    el('studyMeasureIntro').textContent=((measureStep.kind==='group'||measureStep.kind==='mood')&&useSlider)?'Please adjust the slider to indicate your answer.':measureStep.timepoint==='C2_group'?'Thinking about the ball-tossing game, how did you feel?':
-      measureStep.timepoint==='E2'?`Your chosen group: ${futureSelected.map(r=>futureCandidates.find(p=>p.role===r)?.name).join(', ')}.`:
+    const sliderNote='Please adjust the slider to indicate your answer.';
+    el('studyMeasureIntro').textContent=measureStep.timepoint==='C2_group'?'Thinking about the ball-tossing game, how did you feel? '+sliderNote:
+      measureStep.timepoint==='E2'?`Your chosen group: ${futureSelected.map(r=>futureCandidates.find(p=>p.role===r)?.name).join(', ')}. `+sliderNote:
+      ((measureStep.kind==='group'||measureStep.kind==='mood')&&useSlider)?sliderNote:
       measureStep.kind==='future_player'?(person?.isNew?`You have not played with ${person.name} yet. Please give your best guess.`:'Based on what you know so far, please give your best impression.'):'';
     const wrap=el('studyMeasureQuestions');wrap.innerHTML='';
     measureQuestionsFor(measureStep).forEach(q=>{
